@@ -1331,6 +1331,26 @@ class ArrayPjitTest(jtu.JaxTestCase):
           self.assertArraysEqual(s.data._arrays[0], expected_matrix_mul[s.index])
         self.assertArraysEqual(out._value, expected_matrix_mul)
 
+  def test_pjit_array_fully_replicated_output(self):
+    global_input_shape = (8, 2)
+    global_mesh = jtu.create_global_mesh((4, 2), ('x', 'y'))
+    mesh_axes = P('x', 'y')
+
+    input_array, input_data = create_array(global_input_shape, global_mesh, mesh_axes)
+
+    with jax._src.config.jax_array(True):
+      with global_mesh:
+        f = pjit(lambda x: x, out_axis_resources=None)
+
+        out = f(input_array)
+        self.assertIsInstance(out, array.Array)
+        self.assertEqual(out.shape, (8, 2))
+        self.assertEqual(out.addressable_shards[0].data.shape, (8, 2))
+        for s in out.addressable_shards:
+          self.assertLen(s.data._arrays, 1)
+          self.assertArraysEqual(s.data._arrays[0], input_data[s.index])
+        self.assertArraysEqual(out._value, input_data)
+
   def test_non_array_input_error(self):
     input_shape = (8, 2)
     global_mesh = jtu.create_global_mesh((4, 2), ('x', 'y'))
